@@ -46,10 +46,11 @@ class Puppet2d(DynamicModel) :
     f_t = 0.0       
     f_a = 0.02
 
+    channel_radius = 10
     channel_width = None
     constraint_force = 1
 
-    def __init__(self, N=10) :
+    def __init__(self, N=10, channel_radius=10, channel_width=0.2) :
         self.N = N                              # number of points/vertices in discrete model
         self.N_vertices = N
         self.N_edges = N - 1                    # number of edges in discrete model
@@ -65,7 +66,12 @@ class Puppet2d(DynamicModel) :
         self.space_axis_edges = np.linspace(0, 1, self.N_edges)
         self.space_axis_internal_vertices = np.linspace(0, 1, self.N_internal_vertices)
 
-        self.channel_width = 0.2*self.N_edges
+        self.channel_width = channel_width
+        self.channel_radius = channel_radius
+        self.inner_radius = channel_radius
+        self.center_radius = channel_radius + self.channel_width/2
+        self.outer_radius = channel_radius + self.channel_width
+        self.channel_circumference = 2*np.pi*self.center_radius
 
         # store some useful matrices
         self.R = np.array([[0, 1], [-1, 0]])         # 90 degree clockwise rotation matrix
@@ -143,7 +149,8 @@ class Puppet2d(DynamicModel) :
         input_torques = inputs[self.N_edges:]
     
         # compute kinematics from given phase space coordinate vector
-        r, p, e, l, t, n, epsilon, alpha, theta, kappa, De, Depsilon, Dalpha, Dtheta, Dkappa = self.kinematics(x)
+        kinematic_quantities = self.kinematics(x)
+        r, p, e, l, t, n, epsilon, alpha, theta, kappa, De, Depsilon, Dalpha, Dtheta, Dkappa = kinematic_quantities
 
         # compute generalised forces using useful kinematic variables
         tau_epsilon_local = self.sign_a*epsilon - self.A_a*epsilon**2 - self.B_a*epsilon**3 - self.n_a*Depsilon
@@ -193,15 +200,36 @@ class Puppet2d(DynamicModel) :
         F_cx = np.zeros(F_cy.shape)
         F_c = np.array([F_cx, F_cy]).T
 
+        F_c = self.constraint_forces(kinematic_quantities)
+
         F_total = F_a + F_t + F_s + F_c
     
         return F_total.flatten()
 
+    def constraint_forces(self, kinematic_quantities) :
+        # kinematics
+        r, p, e, l, t, n, epsilon, alpha, theta, kappa, De, Depsilon, Dalpha, Dtheta, Dkappa = kinematic_quantities
+        segment_radii = np.linalg.norm(r, axis=1)
+        unit_vectors = (r.T/segment_radii).T
+
+        # forces
+        inner_force = ((segment_radii < self.inner_radius)*self.constraint_force*unit_vectors.T).T
+        outer_force = -((segment_radii > self.outer_radius)*self.constraint_force*unit_vectors.T).T
+        total_constraint_force = inner_force + outer_force
+        return total_constraint_force
+
+
     def generate_initial_state(self, coordinate_std=0, momentum_std=0) :
-        # generate noisy initial position, near a straight line configuration
-        template_rx = np.arange(self.N_vertices)
-        template_ry = np.zeros(self.N_vertices)
+        # our default configuration has all segments equally spaced, wrapped onto the
+        # circular track
+        axial_displacements = np.arange(self.N_vertices)
+        track_angles = 2*np.pi*axial_displacements/self.channel_circumference
+
+        template_rx = self.center_radius*np.cos(track_angles)
+        template_ry = self.center_radius*np.sin(track_angles)
         template_r = np.array([template_rx, template_ry]).T
+
+        # add noise to the template configuration
         initial_r = template_r + coordinate_std*np.random.randn(*template_r.shape)
 
         # generate noisy initial momentum, near rest
