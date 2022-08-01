@@ -20,7 +20,8 @@ momentum_std = 0.01                                              # standard devi
 
 fr = 10                                                         # animation frame rate decimation factor
 SAVE_ANIMATION = True                                          # should we save the animation? (slow)
-OUTPUT_FILENAME = "./channel_crawler_animation.mp4"             # where to save animation
+#OUTPUT_FILENAME = "./channel_crawler_animation.mp4"             # where to save animation
+OUTPUT_FILENAME = "./mihai-test.gif"
 
 
 """
