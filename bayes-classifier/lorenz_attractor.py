@@ -12,6 +12,13 @@ class LorenzAttractor:
         self.state = self.init_state
         self.state_history = [self.state]
 
+    def scipy_f(self, t, r):
+        ''' 
+            scipy.integrate takes arguments as t, r instead of r, t, so call
+            via a wrapper
+        '''
+        return self.f(r, t)
+
     def f(self, r, t):
         x, y, z = r
         s, r, b = self.params['sigma'], self.params['rho'], self.params['beta']
@@ -35,9 +42,14 @@ class LorenzAttractor:
         return soln
 
     def simulate(self):
-        pass
         a, b = self.params['t_init'], self.params['t_finish']
         t = np.linspace(a, b, self.params['n_steps'])
+
+        soln = solve_ivp(self.scipy_f, [a, b], self.init_state, t_eval=t)
+
+        self.state_history = soln.y.T
+
+        return soln.y.T
 
         #self.state_history = solve_ivp(self.evolve_dt, [a, b], self.init_state, t_eval=t)
 
