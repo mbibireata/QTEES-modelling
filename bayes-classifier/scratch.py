@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
-from sdeint import itoint
+from sdeint import itoint, deltaW
 
 class LorenzAttractor:
     def __init__(self, params, init_state):
@@ -12,27 +12,17 @@ class LorenzAttractor:
         self.state = self.init_state
         self.state_history = [self.state]
 
-    def dtx(self, x, y, z=None):
-        return self.params['sigma'] * (y - x)
-
-    def dty(self, x, y, z):
-        return x * (self.params['rho'] - z) - y
-
-    def dtz(self, x, y, z):
-        return x * y - self.params['beta'] * z
-
-    def evolve_dt(self, t, state):
-        x, y, z = state
-        s, r, b = self.params['sigma'], self.params['rho'], self.params['beta']
-        return np.array([s * (y - x), x * (r - z) - y, x * y - b * z])
-
     def f(self, r, t):
         x, y, z = r
         s, r, b = self.params['sigma'], self.params['rho'], self.params['beta']
         return np.array([s * (y - x), x * (r - z) - y, x * y - b * z])
 
     def G(self, r, t):
-        return np.diag([1., 1., 1.])
+        #return np.diag(deltaW(1, 3, 1)[0])
+        #return np.array([[.5, .5, 0.],
+        #                 [.5, .5, .5],
+        #                 [.5, .5, .5]], dtype=float)
+        return np.diag([.5, .5, .5])
 
     def simulate_stochastic(self):
         a, b = self.params['t_init'], self.params['t_finish']
@@ -40,10 +30,12 @@ class LorenzAttractor:
 
         soln = itoint(self.f, self.G, self.init_state, t)
 
-
         self.state_history = soln
 
+        return soln
+
     def simulate(self):
+        pass
         a, b = self.params['t_init'], self.params['t_finish']
         t = np.linspace(a, b, self.params['n_steps'])
 
@@ -53,15 +45,20 @@ class LorenzAttractor:
         fig = plt.figure("Dynamical System")
         ax = plt.axes(projection='3d')
        
-        #data = np.array(self.state_history)
-        #data = self.state_history.y
         data = self.state_history
 
         ax.plot3D(data[:, 0], data[:, 1], data[:, 2], lw=1, color='r')
-        #ax.plot3D(data[0], data[1], data[2], lw=1, color='r')
 
         plt.show()
 
+def visualize(data):
+    fig = plt.figure("Dynamical System")
+    ax = plt.axes(projection='3d')
+   
+    for d in data:
+        ax.plot3D(d[:, 0], d[:, 1], d[:, 2], lw=1)
+
+    plt.show()
 
 def main():
     params = {
@@ -73,12 +70,15 @@ def main():
         'n_steps' : 10001
     }
 
-    init_state = np.array([0., .5, 0.5], dtype=float)
+    init_state = np.array([1., 1., 1.], dtype=float)
 
     system = LorenzAttractor(params, init_state)
-    #system.simulate()
-    system.simulate_stochastic()
-    system.visualize()
+    soln1 = system.simulate_stochastic()
+
+    perturbed = LorenzAttractor(params, init_state + np.array([0., 0., 0.001]))
+    soln2 = perturbed.simulate_stochastic()
+    visualize([soln1, soln2])
+    #system.visualize()
 
 if __name__ == "__main__":
     main()
