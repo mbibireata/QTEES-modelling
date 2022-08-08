@@ -12,6 +12,21 @@ class LorenzAttractor:
         self.state = self.init_state
         self.state_history = [self.state]
 
+    def skopt_f(self, x, noise_level=0.):
+        a, b = self.params['t_init'], self.params['t_finish']
+        t = np.linspace(a, b, self.params['n_steps'])
+
+        # Assign parameters according to dimensions in x
+        self.params['sigma'] = x[0]
+        self.params['rho'] =   x[1]
+        self.params['beta'] =  x[2]
+
+        soln = itoint(self.f, self.G, self.init_state, t)
+
+        # Return final point in trajectory as scalar formed by
+        # linear combination of xyz components
+        return np.sum(np.array([2., 3., 5.]) * soln[-1])
+
     def scipy_f(self, t, r):
         ''' 
             scipy.integrate takes arguments as t, r instead of r, t, so call
